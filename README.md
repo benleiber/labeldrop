@@ -4,6 +4,8 @@ LabelDrop is a LAN-only FastAPI print server for a MUNBYN ITPP130B attached to a
 
 The app layer handles phone uploads, PNG normalization, previews, and print buttons. The reusable printer logic stays in [`munbyn-itpp130b-linux`](https://github.com/benleiber/munbyn-itpp130b-linux), which is consumed as a Python dependency.
 
+Fresh machine setup: [docs/QUICKSTART.md](docs/QUICKSTART.md)
+
 ## Current Scope
 
 - FastAPI backend with a simple HTML frontend.
