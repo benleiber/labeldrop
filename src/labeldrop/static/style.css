@@ -32,7 +32,7 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 h1,
@@ -56,9 +56,7 @@ h3 {
   font-size: 1rem;
 }
 
-.topbar p,
 .empty,
-dd,
 .upload-meta p,
 .helper {
   color: var(--muted);
@@ -83,15 +81,10 @@ dd,
 
 .focus-header {
   display: flex;
-  align-items: start;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 14px;
-}
-
-.focus-copy {
-  color: var(--muted);
-  margin-bottom: 0;
 }
 
 .status-line {
@@ -113,7 +106,7 @@ dd,
 }
 
 button,
-input::file-selector-button {
+.file-picker {
   border: 0;
   border-radius: 6px;
   background: var(--accent);
@@ -121,11 +114,13 @@ input::file-selector-button {
   cursor: pointer;
   font: inherit;
   font-weight: 700;
+  line-height: 1;
   padding: 10px 14px;
+  text-decoration: none;
 }
 
 button:hover,
-input::file-selector-button:hover {
+.file-picker:hover {
   filter: brightness(0.92);
 }
 
@@ -136,12 +131,21 @@ input::file-selector-button:hover {
   flex-wrap: wrap;
 }
 
+.upload-input {
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  position: absolute;
+  width: 1px;
+}
+
 .helper {
   margin-bottom: 0;
 }
 
 .selected-file {
-  margin: 10px 0 0;
+  margin: 8px 0 0;
   color: var(--text);
   font-weight: 600;
   overflow-wrap: anywhere;

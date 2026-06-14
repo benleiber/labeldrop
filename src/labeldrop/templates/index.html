@@ -11,7 +11,6 @@
       <header class="topbar">
         <div>
           <h1>LabelDrop</h1>
-          <p>Local MUNBYN ITPP130B print server</p>
         </div>
       </header>
 
@@ -24,26 +23,17 @@
 
       <section class="panel focus-panel">
         <div class="focus-header">
-          <div>
-            <h2>Upload Label</h2>
-            <p class="focus-copy">LabelDrop is ready when the printer is ready. Pick a file, confirm the filename, and upload.</p>
-          </div>
+          <h2>Upload Label</h2>
           <p class="status-line {% if printer.ready %}ready{% else %}not-ready{% endif %}">
             {% if printer.ready %}Printer ready{% else %}Printer needs attention{% endif %}
           </p>
         </div>
         <form class="upload-form" action="/upload" method="post" enctype="multipart/form-data">
-          <input id="upload-file" type="file" name="file" accept=".png,.pdf,image/png,application/pdf" required>
+          <input id="upload-file" class="upload-input" type="file" name="file" accept=".png,.pdf,image/png,application/pdf" required>
+          <label class="file-picker" for="upload-file">Choose File</label>
           <button type="submit">Upload label</button>
         </form>
         <p id="selected-file" class="selected-file" aria-live="polite">No file selected.</p>
-        <p class="helper">
-          {% if printer.ready %}
-            Accepts PNG or one-page label PDF. PDF uploads render page 1, rotate landscape to portrait, and generate a PNG preview.
-          {% else %}
-            Check the printer connection, paper, and `/dev/usb/lp0` access before printing.
-          {% endif %}
-        </p>
       </section>
 
       <section>

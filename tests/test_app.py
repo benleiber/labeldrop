@@ -90,6 +90,7 @@ class LabelDropAppTests(unittest.TestCase):
                     self.assertIn("Print test label", home.text)
                     self.assertIn("PNG to PNG", home.text)
                     self.assertIn("Printer ready", home.text)
+                    self.assertIn("Choose File", home.text)
                     self.assertIn("No file selected.", home.text)
                     self.assertIn("/delete/", home.text)
 
