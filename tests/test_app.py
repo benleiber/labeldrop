@@ -38,21 +38,34 @@ def sideways_pdf_bytes() -> bytes:
     return document.tobytes()
 
 
+def visible_bbox(image: Image.Image, threshold: int = 245):
+    grayscale = image.convert("L")
+    binary = grayscale.point(lambda value: 255 if value < threshold else 0, mode="1")
+    return binary.getbbox()
+
+
 class LabelDropAppTests(unittest.TestCase):
-    def test_normalize_png_flattens_transparency_to_white(self) -> None:
+    def test_normalize_png_flattens_transparency_to_white_and_crops(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             appmod = load_app_module(Path(tmp))
             source = Path(tmp) / "source.png"
             target = Path(tmp) / "target.png"
-            source.write_bytes(png_bytes())
+            image = Image.new("RGBA", (120, 120), (255, 255, 255, 255))
+            image.paste((255, 0, 0, 0), (0, 0, 120, 120))
+            image.paste((0, 0, 0, 255), (40, 30, 80, 90))
+            image.save(source, format="PNG")
 
-            size = appmod.normalize_png(source, target)
+            result = appmod.normalize_png(source, target)
 
-            self.assertEqual(size, (2, 1))
             with Image.open(target) as normalized:
                 self.assertEqual(normalized.mode, "RGB")
                 self.assertEqual(normalized.getpixel((0, 0)), (255, 255, 255))
-                self.assertEqual(normalized.getpixel((1, 0)), (0, 0, 0))
+                bbox = visible_bbox(normalized)
+                self.assertIsNotNone(bbox)
+                self.assertLess(normalized.width, 120)
+                self.assertLess(normalized.height, 120)
+            self.assertEqual(result["rotation_applied"], 0)
+            self.assertLess(result["processed_dimensions"]["width"], result["original_dimensions"]["width"])
 
     def test_home_uploads_png_and_lists_recent_preview(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -98,7 +111,17 @@ class LabelDropAppTests(unittest.TestCase):
                 self.assertEqual(Path(job["processed_path"]).suffix.lower(), ".png")
                 self.assertGreater(job["height"], job["width"])
                 self.assertIn("rendered", job["dimensions"])
+                self.assertIn("cropped", job["dimensions"])
                 self.assertIn("processed", job["dimensions"])
+                self.assertIn("crop_box", job)
+
+                with Image.open(job["processed_path"]) as preview:
+                    bbox = visible_bbox(preview)
+                    self.assertIsNotNone(bbox)
+                    used_width = bbox[2] - bbox[0]
+                    used_height = bbox[3] - bbox[1]
+                    self.assertGreater(used_width / preview.width, 0.55)
+                    self.assertGreater(used_height / preview.height, 0.68)
 
     def test_print_upload_records_success_without_real_printer(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

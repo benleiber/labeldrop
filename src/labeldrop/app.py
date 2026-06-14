@@ -130,7 +130,35 @@ def flatten_to_white(image: Image.Image) -> Image.Image:
     return base.convert("RGB")
 
 
-def normalize_png(source: Path, target: Path) -> tuple[int, int]:
+def crop_white_margins(image: Image.Image, threshold: int = 245, padding: int = 24) -> tuple[Image.Image, dict[str, int]]:
+    grayscale = image.convert("L")
+    binary = grayscale.point(lambda value: 255 if value < threshold else 0, mode="1")
+    bbox = binary.getbbox()
+    if bbox is None:
+        return image, {"left": 0, "top": 0, "right": image.width, "bottom": image.height}
+
+    left = max(0, bbox[0] - padding)
+    top = max(0, bbox[1] - padding)
+    right = min(image.width, bbox[2] + padding)
+    bottom = min(image.height, bbox[3] + padding)
+    return image.crop((left, top, right, bottom)), {"left": left, "top": top, "right": right, "bottom": bottom}
+
+
+def normalize_label_image(image: Image.Image) -> tuple[Image.Image, dict[str, Any]]:
+    flattened = flatten_to_white(image)
+    cropped, crop_box = crop_white_margins(flattened)
+    rotation_applied = 0
+    if cropped.width > cropped.height:
+        cropped = cropped.rotate(90, expand=True)
+        rotation_applied = 90
+    return cropped, {
+        "rotation_applied": rotation_applied,
+        "crop_box": crop_box,
+        "cropped_dimensions": {"width": cropped.width, "height": cropped.height},
+    }
+
+
+def normalize_png(source: Path, target: Path) -> dict[str, Any]:
     try:
         with Image.open(source) as img:
             img.verify()
@@ -138,9 +166,14 @@ def normalize_png(source: Path, target: Path) -> tuple[int, int]:
             img.load()
             if img.format != "PNG":
                 raise ValueError("Uploaded file is not a PNG")
-            normalized = flatten_to_white(img)
+            normalized, details = normalize_label_image(img)
             normalized.save(target, "PNG", optimize=True)
-            return normalized.size
+            return {
+                "original_dimensions": {"width": img.width, "height": img.height},
+                "processed_dimensions": {"width": normalized.width, "height": normalized.height},
+                "rotation_applied": details["rotation_applied"],
+                "crop_box": details["crop_box"],
+            }
     except (UnidentifiedImageError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -168,30 +201,29 @@ def render_pdf_first_page(source: Path, target: Path) -> dict[str, Any]:
 
     mode = "RGBA" if pixmap.alpha else "RGB"
     rendered = Image.frombytes(mode, (pixmap.width, pixmap.height), pixmap.samples)
-    flattened = flatten_to_white(rendered)
-    rotation_applied = 0
-    if flattened.width > flattened.height:
-        flattened = flattened.rotate(90, expand=True)
-        rotation_applied = 90
-    normalized = fit_to_label_canvas(flattened)
+    normalized_label, details = normalize_label_image(rendered)
+    normalized = fit_to_label_canvas(normalized_label)
     normalized.save(target, "PNG", optimize=True)
     return {
         "rendered_dimensions": {"width": pixmap.width, "height": pixmap.height},
+        "cropped_dimensions": details["cropped_dimensions"],
         "processed_dimensions": {"width": normalized.width, "height": normalized.height},
-        "rotation_applied": rotation_applied,
+        "rotation_applied": details["rotation_applied"],
+        "crop_box": details["crop_box"],
     }
 
 
 def process_upload(upload_path: Path, processed_path: Path, original_type: str) -> dict[str, Any]:
     if original_type == "png":
-        width, height = normalize_png(upload_path, processed_path)
+        png_result = normalize_png(upload_path, processed_path)
         return {
             "original_type": "png",
             "rendered_type": "png",
-            "rotation_applied": 0,
+            "rotation_applied": png_result["rotation_applied"],
+            "crop_box": png_result["crop_box"],
             "dimensions": {
-                "original": {"width": width, "height": height},
-                "processed": {"width": width, "height": height},
+                "original": png_result["original_dimensions"],
+                "processed": png_result["processed_dimensions"],
             },
         }
     if original_type == "pdf":
@@ -200,8 +232,10 @@ def process_upload(upload_path: Path, processed_path: Path, original_type: str) 
             "original_type": "pdf",
             "rendered_type": "png",
             "rotation_applied": pdf_result["rotation_applied"],
+            "crop_box": pdf_result["crop_box"],
             "dimensions": {
                 "rendered": pdf_result["rendered_dimensions"],
+                "cropped": pdf_result["cropped_dimensions"],
                 "processed": pdf_result["processed_dimensions"],
             },
         }
@@ -259,6 +293,7 @@ async def upload_label(file: UploadFile = File(...)) -> RedirectResponse:
         "original_type": processing["original_type"],
         "rendered_type": processing["rendered_type"],
         "rotation_applied": processing["rotation_applied"],
+        "crop_box": processing["crop_box"],
         "upload_path": str(upload_path),
         "processed_path": str(processed_path),
         "preview_url": f"/processed/{job_id}.png",
