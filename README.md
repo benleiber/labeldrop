@@ -6,6 +6,8 @@ The app layer handles phone uploads, PNG normalization, previews, and print butt
 
 Fresh machine setup: [docs/QUICKSTART.md](docs/QUICKSTART.md)
 
+This is an unofficial community project. It is not affiliated with, endorsed by, or supported by MUNBYN. MUNBYN and ITPP130B are trademarks of their respective owners.
+
 ## Current Scope
 
 - FastAPI backend with a simple HTML frontend.

@@ -2,6 +2,8 @@
 
 This guide gets a fresh Debian machine from first boot to a hosted LAN print server for the MUNBYN ITPP130B.
 
+This is an unofficial community project. It is not affiliated with, endorsed by, or supported by MUNBYN. MUNBYN and ITPP130B are trademarks of their respective owners.
+
 The end result is:
 
 - LabelDrop running on Debian

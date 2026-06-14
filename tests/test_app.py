@@ -33,8 +33,8 @@ def png_bytes(mode: str = "RGBA") -> bytes:
 def sideways_pdf_bytes() -> bytes:
     document = fitz.open()
     page = document.new_page(width=432, height=288)
-    page.insert_text((48, 48), "USPS TEST LABEL", fontsize=28, rotate=90)
-    page.insert_text((90, 52), "SIDEWAYS PDF FIXTURE", fontsize=18, rotate=90)
+    page.insert_text((48, 48), "THERMAL LABEL FIXTURE", fontsize=28, rotate=90)
+    page.insert_text((90, 52), "SIDEWAYS SAMPLE PDF", fontsize=18, rotate=90)
     return document.tobytes()
 
 
@@ -100,7 +100,7 @@ class LabelDropAppTests(unittest.TestCase):
             with TestClient(appmod.app) as client:
                 response = client.post(
                     "/upload",
-                    files={"file": ("etsy-usps-label.pdf", sideways_pdf_bytes(), "application/pdf")},
+                    files={"file": ("shipping-label.pdf", sideways_pdf_bytes(), "application/pdf")},
                     follow_redirects=False,
                 )
 
@@ -148,7 +148,7 @@ class LabelDropAppTests(unittest.TestCase):
             with TestClient(appmod.app) as client:
                 client.post(
                     "/upload",
-                    files={"file": ("etsy-usps-label.pdf", sideways_pdf_bytes(), "application/pdf")},
+                    files={"file": ("shipping-label.pdf", sideways_pdf_bytes(), "application/pdf")},
                 )
                 job = appmod.recent_uploads()[0]
                 legacy = appmod.load_job(job["id"])
