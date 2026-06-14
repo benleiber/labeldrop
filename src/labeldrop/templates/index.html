@@ -13,9 +13,6 @@
           <h1>LabelDrop</h1>
           <p>Local MUNBYN ITPP130B print server</p>
         </div>
-        <form action="/print-test" method="post">
-          <button type="submit">Print test label</button>
-        </form>
       </header>
 
       {% if message %}
@@ -29,25 +26,25 @@
         <div>
           <h2>Printer</h2>
           <p class="status-line {% if printer.ready %}ready{% else %}not-ready{% endif %}">
-            {% if printer.ready %}Ready{% else %}Needs attention{% endif %}
+            {% if printer.ready %}Printer ready{% else %}Printer needs attention{% endif %}
           </p>
         </div>
-        <dl>
-          <dt>Device</dt>
-          <dd>{{ printer.device }}</dd>
-          <dt>Identify</dt>
-          <dd>{{ printer.identify }}</dd>
-          <dt>Status</dt>
-          <dd>{{ printer.status }}</dd>
-        </dl>
+        <p class="status-copy">
+          {% if printer.ready %}
+            LabelDrop can send labels to the printer now.
+          {% else %}
+            Check the printer connection, paper, and `/dev/usb/lp0` access before printing.
+          {% endif %}
+        </p>
       </section>
 
       <section class="panel">
         <h2>Upload Label</h2>
         <form class="upload-form" action="/upload" method="post" enctype="multipart/form-data">
-          <input type="file" name="file" accept=".png,.pdf,image/png,application/pdf" required>
+          <input id="upload-file" type="file" name="file" accept=".png,.pdf,image/png,application/pdf" required>
           <button type="submit">Upload label</button>
         </form>
+        <p id="selected-file" class="selected-file" aria-live="polite">No file selected.</p>
         <p class="helper">Accepts PNG or one-page label PDF. PDF uploads render page 1, rotate landscape to portrait, and generate a PNG preview.</p>
       </section>
 
@@ -84,6 +81,27 @@
           <p class="empty">No uploads yet.</p>
         {% endif %}
       </section>
+
+      <section class="panel utility-panel">
+        <h2>Printer check</h2>
+        <p class="helper">Use this if you want a quick transport check before uploading a real label.</p>
+        <form action="/print-test" method="post">
+          <button type="submit">Print test label</button>
+        </form>
+      </section>
     </main>
+    <script>
+      const uploadInput = document.getElementById("upload-file");
+      const selectedFile = document.getElementById("selected-file");
+
+      if (uploadInput && selectedFile) {
+        uploadInput.addEventListener("change", () => {
+          const name = uploadInput.files && uploadInput.files.length > 0
+            ? uploadInput.files[0].name
+            : "No file selected.";
+          selectedFile.textContent = name;
+        });
+      }
+    </script>
   </body>
 </html>

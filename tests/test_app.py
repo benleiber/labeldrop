@@ -89,6 +89,8 @@ class LabelDropAppTests(unittest.TestCase):
                     self.assertIn("/processed/", home.text)
                     self.assertIn("Print test label", home.text)
                     self.assertIn("PNG to PNG", home.text)
+                    self.assertIn("Printer ready", home.text)
+                    self.assertIn("No file selected.", home.text)
 
     def test_pdf_upload_renders_first_page_and_records_rotation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

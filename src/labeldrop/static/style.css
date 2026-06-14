@@ -83,6 +83,11 @@ dd,
   gap: 20px;
 }
 
+.status-copy {
+  margin: 0;
+  color: var(--muted);
+}
+
 .status-line {
   display: inline-flex;
   margin: 0;
@@ -99,22 +104,6 @@ dd,
 .not-ready {
   background: #fee2e2;
   color: var(--danger);
-}
-
-dl {
-  display: grid;
-  grid-template-columns: 88px 1fr;
-  gap: 8px 14px;
-  margin: 0;
-}
-
-dt {
-  font-weight: 700;
-}
-
-dd {
-  margin: 0;
-  overflow-wrap: anywhere;
 }
 
 button,
@@ -145,6 +134,13 @@ input::file-selector-button:hover {
   margin-bottom: 0;
 }
 
+.selected-file {
+  margin: 10px 0 0;
+  color: var(--text);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
 .notice {
   border-radius: 8px;
   margin-bottom: 16px;
@@ -166,6 +162,7 @@ input::file-selector-button:hover {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   gap: 16px;
+  margin-bottom: 20px;
 }
 
 .upload-card {
@@ -202,17 +199,13 @@ input::file-selector-button:hover {
   color: var(--danger);
 }
 
+.utility-panel form {
+  margin-top: 12px;
+}
+
 @media (max-width: 640px) {
   .topbar,
   .status-panel {
     display: block;
-  }
-
-  .topbar form {
-    margin-top: 14px;
-  }
-
-  dl {
-    grid-template-columns: 1fr;
   }
 }
