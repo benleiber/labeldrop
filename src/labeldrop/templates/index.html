@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>LabelDrop</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/style.css') }}">
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <h1>LabelDrop</h1>
+          <p>Local MUNBYN ITPP130B print server</p>
+        </div>
+        <form action="/print-test" method="post">
+          <button type="submit">Print test label</button>
+        </form>
+      </header>
+
+      {% if message %}
+        <p class="notice ok">{{ message }}</p>
+      {% endif %}
+      {% if error %}
+        <p class="notice error">{{ error }}</p>
+      {% endif %}
+
+      <section class="panel status-panel">
+        <div>
+          <h2>Printer</h2>
+          <p class="status-line {% if printer.ready %}ready{% else %}not-ready{% endif %}">
+            {% if printer.ready %}Ready{% else %}Needs attention{% endif %}
+          </p>
+        </div>
+        <dl>
+          <dt>Device</dt>
+          <dd>{{ printer.device }}</dd>
+          <dt>Identify</dt>
+          <dd>{{ printer.identify }}</dd>
+          <dt>Status</dt>
+          <dd>{{ printer.status }}</dd>
+        </dl>
+      </section>
+
+      <section class="panel">
+        <h2>Upload PNG</h2>
+        <form class="upload-form" action="/upload" method="post" enctype="multipart/form-data">
+          <input type="file" name="file" accept="image/png" required>
+          <button type="submit">Upload label</button>
+        </form>
+      </section>
+
+      <section>
+        <h2>Recent uploads</h2>
+        {% if uploads %}
+          <div class="upload-grid">
+            {% for item in uploads %}
+              <article class="upload-card">
+                <img src="{{ item.preview_url }}" alt="Preview for {{ item.original_name }}">
+                <div class="upload-meta">
+                  <h3>{{ item.original_name }}</h3>
+                  <p>{{ item.width }} x {{ item.height }} px</p>
+                  <p>{{ item.created_at }}</p>
+                  {% if item.last_print %}
+                    {% if item.last_print.ok %}
+                      <p class="last-print ok-text">Printed {{ item.last_print.at }}</p>
+                    {% else %}
+                      <p class="last-print error-text">Failed {{ item.last_print.at }}</p>
+                    {% endif %}
+                  {% endif %}
+                </div>
+                <form action="/print/{{ item.id }}" method="post">
+                  <button type="submit">Print</button>
+                </form>
+              </article>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="empty">No uploads yet.</p>
+        {% endif %}
+      </section>
+    </main>
+  </body>
+</html>

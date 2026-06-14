@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "labeldrop"
+version = "0.1.0"
+description = "LAN-only FastAPI upload-and-print server for MUNBYN ITPP130B labels"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.111",
+  "jinja2>=3.1",
+  "pillow>=10",
+  "python-multipart>=0.0.9",
+  "uvicorn[standard]>=0.30",
+  "munbyn-itpp130b[image] @ git+https://github.com/benleiber/munbyn-itpp130b-linux.git@v0.2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "httpx>=0.27",
+  "ruff>=0.5",
+]
+
+[project.scripts]
+labeldrop = "labeldrop.app:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+labeldrop = ["templates/*.html", "static/*.css"]
