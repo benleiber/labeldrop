@@ -90,6 +90,13 @@ def save_job(job: dict[str, Any]) -> None:
     metadata_path(job["id"]).write_text(json.dumps(job, indent=2), encoding="utf-8")
 
 
+def delete_job_files(job: dict[str, Any]) -> None:
+    for path_value in [job.get("upload_path"), job.get("processed_path"), str(metadata_path(job["id"]))]:
+        if not path_value:
+            continue
+        Path(path_value).unlink(missing_ok=True)
+
+
 def redirect_home(**params: str) -> RedirectResponse:
     return RedirectResponse(f"/?{urlencode(params)}", status_code=303)
 
@@ -362,6 +369,14 @@ def print_upload(job_id: str) -> RedirectResponse:
         save_job(job)
         LOGGER.exception("Print failed for upload id=%s", job_id)
         return redirect_home(error=f"Print failed: {exc}")
+
+
+@app.post("/delete/{job_id}")
+def delete_upload(job_id: str) -> RedirectResponse:
+    job = load_job(job_id)
+    delete_job_files(job)
+    LOGGER.info("Deleted upload id=%s name=%s", job_id, job.get("original_name"))
+    return redirect_home(message="Upload deleted.")
 
 
 @app.post("/print-test")

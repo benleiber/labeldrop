@@ -22,30 +22,28 @@
         <p class="notice error">{{ error }}</p>
       {% endif %}
 
-      <section class="panel status-panel">
-        <div>
-          <h2>Printer</h2>
+      <section class="panel focus-panel">
+        <div class="focus-header">
+          <div>
+            <h2>Upload Label</h2>
+            <p class="focus-copy">LabelDrop is ready when the printer is ready. Pick a file, confirm the filename, and upload.</p>
+          </div>
           <p class="status-line {% if printer.ready %}ready{% else %}not-ready{% endif %}">
             {% if printer.ready %}Printer ready{% else %}Printer needs attention{% endif %}
           </p>
         </div>
-        <p class="status-copy">
-          {% if printer.ready %}
-            LabelDrop can send labels to the printer now.
-          {% else %}
-            Check the printer connection, paper, and `/dev/usb/lp0` access before printing.
-          {% endif %}
-        </p>
-      </section>
-
-      <section class="panel">
-        <h2>Upload Label</h2>
         <form class="upload-form" action="/upload" method="post" enctype="multipart/form-data">
           <input id="upload-file" type="file" name="file" accept=".png,.pdf,image/png,application/pdf" required>
           <button type="submit">Upload label</button>
         </form>
         <p id="selected-file" class="selected-file" aria-live="polite">No file selected.</p>
-        <p class="helper">Accepts PNG or one-page label PDF. PDF uploads render page 1, rotate landscape to portrait, and generate a PNG preview.</p>
+        <p class="helper">
+          {% if printer.ready %}
+            Accepts PNG or one-page label PDF. PDF uploads render page 1, rotate landscape to portrait, and generate a PNG preview.
+          {% else %}
+            Check the printer connection, paper, and `/dev/usb/lp0` access before printing.
+          {% endif %}
+        </p>
       </section>
 
       <section>
@@ -54,6 +52,9 @@
           <div class="upload-grid">
             {% for item in uploads %}
               <article class="upload-card">
+                <form class="delete-form" action="/delete/{{ item.id }}" method="post">
+                  <button class="delete-button" type="submit" aria-label="Delete {{ item.original_name }}">X</button>
+                </form>
                 <img src="{{ item.preview_url }}" alt="Preview for {{ item.original_name }}">
                 <div class="upload-meta">
                   <h3>{{ item.original_name }}</h3>

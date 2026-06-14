@@ -91,6 +91,7 @@ class LabelDropAppTests(unittest.TestCase):
                     self.assertIn("PNG to PNG", home.text)
                     self.assertIn("Printer ready", home.text)
                     self.assertIn("No file selected.", home.text)
+                    self.assertIn("/delete/", home.text)
 
     def test_pdf_upload_renders_first_page_and_records_rotation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -164,6 +165,20 @@ class LabelDropAppTests(unittest.TestCase):
                 self.assertIn("crop_box", updated)
                 self.assertIn("cropped", updated["dimensions"])
                 self.assertEqual(updated["last_print"]["bytes_sent"], 4321)
+
+    def test_delete_upload_removes_stored_files(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            appmod = load_app_module(Path(tmp))
+            with TestClient(appmod.app) as client:
+                client.post("/upload", files={"file": ("label.png", png_bytes(), "image/png")})
+                job = appmod.recent_uploads()[0]
+
+                response = client.post(f"/delete/{job['id']}", follow_redirects=False)
+
+                self.assertEqual(response.status_code, 303)
+                self.assertFalse(Path(job["upload_path"]).exists())
+                self.assertFalse(Path(job["processed_path"]).exists())
+                self.assertFalse(appmod.metadata_path(job["id"]).exists())
 
 
 if __name__ == "__main__":

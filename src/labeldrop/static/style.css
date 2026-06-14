@@ -77,15 +77,21 @@ dd,
   margin-bottom: 20px;
 }
 
-.status-panel {
-  display: grid;
-  grid-template-columns: minmax(160px, 240px) 1fr;
-  gap: 20px;
+.focus-panel {
+  margin-bottom: 24px;
 }
 
-.status-copy {
-  margin: 0;
+.focus-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.focus-copy {
   color: var(--muted);
+  margin-bottom: 0;
 }
 
 .status-line {
@@ -169,6 +175,7 @@ input::file-selector-button:hover {
   display: grid;
   grid-template-rows: 220px 1fr auto;
   overflow: hidden;
+  position: relative;
 }
 
 .upload-card img {
@@ -191,6 +198,28 @@ input::file-selector-button:hover {
   width: 100%;
 }
 
+.delete-form {
+  inset: 10px 10px auto auto;
+  padding: 0;
+  position: absolute;
+  z-index: 1;
+}
+
+.delete-button {
+  background: rgb(255 255 255 / 92%);
+  border: 1px solid var(--line);
+  color: var(--danger);
+  min-height: 32px;
+  min-width: 32px;
+  padding: 0;
+  width: 32px;
+}
+
+.delete-button:hover {
+  background: #fff;
+  filter: none;
+}
+
 .ok-text {
   color: #166534;
 }
@@ -205,7 +234,11 @@ input::file-selector-button:hover {
 
 @media (max-width: 640px) {
   .topbar,
-  .status-panel {
+  .focus-header {
     display: block;
+  }
+
+  .focus-header .status-line {
+    margin-top: 12px;
   }
 }
