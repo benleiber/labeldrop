@@ -26,6 +26,7 @@ LOGGER = logging.getLogger("labeldrop")
 LABEL_4X6 = Label.shipping_4x6()
 LABEL_WIDTH_DOTS = int(round(LABEL_4X6.width_mm * LABEL_4X6.dots_per_mm))
 LABEL_HEIGHT_DOTS = int(round(LABEL_4X6.height_mm * LABEL_4X6.dots_per_mm))
+PROCESSING_VERSION = 2
 
 
 @dataclass(frozen=True)
@@ -242,6 +243,33 @@ def process_upload(upload_path: Path, processed_path: Path, original_type: str) 
     raise HTTPException(status_code=400, detail="Unsupported upload type")
 
 
+def apply_processing_to_job(job: dict[str, Any]) -> dict[str, Any]:
+    processing = process_upload(Path(job["upload_path"]), Path(job["processed_path"]), job["original_type"])
+    job.update(
+        {
+            "rendered_type": processing["rendered_type"],
+            "rotation_applied": processing["rotation_applied"],
+            "crop_box": processing["crop_box"],
+            "width": processing["dimensions"]["processed"]["width"],
+            "height": processing["dimensions"]["processed"]["height"],
+            "dimensions": processing["dimensions"],
+            "processing_version": PROCESSING_VERSION,
+        }
+    )
+    return job
+
+
+def needs_reprocessing(job: dict[str, Any]) -> bool:
+    if job.get("processing_version") != PROCESSING_VERSION:
+        return True
+    if job.get("crop_box") is None:
+        return True
+    dimensions = job.get("dimensions", {})
+    if job.get("original_type") == "pdf" and "cropped" not in dimensions:
+        return True
+    return False
+
+
 def print_image(path: Path) -> int:
     payload = TSPLGenerator(LABEL_4X6).from_image(path, invert=True)
     return USBTransport(settings.device).send(payload)
@@ -291,6 +319,7 @@ async def upload_label(file: UploadFile = File(...)) -> RedirectResponse:
         "created_at": utc_now(),
         "original_name": original_name,
         "original_type": processing["original_type"],
+        "processing_version": PROCESSING_VERSION,
         "rendered_type": processing["rendered_type"],
         "rotation_applied": processing["rotation_applied"],
         "crop_box": processing["crop_box"],
@@ -319,6 +348,10 @@ async def upload_label(file: UploadFile = File(...)) -> RedirectResponse:
 def print_upload(job_id: str) -> RedirectResponse:
     job = load_job(job_id)
     try:
+        if needs_reprocessing(job):
+            LOGGER.info("Reprocessing legacy upload id=%s before print", job_id)
+            job = apply_processing_to_job(job)
+            save_job(job)
         sent = print_image(Path(job["processed_path"]))
         job["last_print"] = {"at": utc_now(), "ok": True, "bytes_sent": sent}
         save_job(job)

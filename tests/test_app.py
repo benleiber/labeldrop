@@ -138,6 +138,31 @@ class LabelDropAppTests(unittest.TestCase):
                 self.assertTrue(updated["last_print"]["ok"])
                 self.assertEqual(updated["last_print"]["bytes_sent"], 1234)
 
+    def test_print_reprocesses_legacy_pdf_job(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            appmod = load_app_module(Path(tmp))
+            with TestClient(appmod.app) as client:
+                client.post(
+                    "/upload",
+                    files={"file": ("etsy-usps-label.pdf", sideways_pdf_bytes(), "application/pdf")},
+                )
+                job = appmod.recent_uploads()[0]
+                legacy = appmod.load_job(job["id"])
+                legacy.pop("crop_box", None)
+                legacy.pop("processing_version", None)
+                legacy["dimensions"].pop("cropped", None)
+                appmod.save_job(legacy)
+
+                with patch.object(appmod, "print_image", return_value=4321):
+                    response = client.post(f"/print/{job['id']}", follow_redirects=False)
+
+                self.assertEqual(response.status_code, 303)
+                updated = appmod.load_job(job["id"])
+                self.assertEqual(updated["processing_version"], appmod.PROCESSING_VERSION)
+                self.assertIn("crop_box", updated)
+                self.assertIn("cropped", updated["dimensions"])
+                self.assertEqual(updated["last_print"]["bytes_sent"], 4321)
+
 
 if __name__ == "__main__":
     unittest.main()
