@@ -12,6 +12,7 @@ dependencies = [
   "fastapi>=0.111",
   "jinja2>=3.1",
   "pillow>=10",
+  "pymupdf>=1.24",
   "python-multipart>=0.0.9",
   "uvicorn[standard]>=0.30",
   "munbyn-itpp130b[image] @ git+https://github.com/benleiber/munbyn-itpp130b-linux.git@v0.2.0",

@@ -9,6 +9,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import fitz
 from fastapi.testclient import TestClient
 from PIL import Image
 
@@ -27,6 +28,14 @@ def png_bytes(mode: str = "RGBA") -> bytes:
     buf = io.BytesIO()
     image.save(buf, format="PNG")
     return buf.getvalue()
+
+
+def sideways_pdf_bytes() -> bytes:
+    document = fitz.open()
+    page = document.new_page(width=432, height=288)
+    page.insert_text((48, 48), "USPS TEST LABEL", fontsize=28, rotate=90)
+    page.insert_text((90, 52), "SIDEWAYS PDF FIXTURE", fontsize=18, rotate=90)
+    return document.tobytes()
 
 
 class LabelDropAppTests(unittest.TestCase):
@@ -66,6 +75,30 @@ class LabelDropAppTests(unittest.TestCase):
                     self.assertIn("label.png", home.text)
                     self.assertIn("/processed/", home.text)
                     self.assertIn("Print test label", home.text)
+                    self.assertIn("PNG to PNG", home.text)
+
+    def test_pdf_upload_renders_first_page_and_records_rotation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            appmod = load_app_module(Path(tmp))
+            with TestClient(appmod.app) as client:
+                response = client.post(
+                    "/upload",
+                    files={"file": ("etsy-usps-label.pdf", sideways_pdf_bytes(), "application/pdf")},
+                    follow_redirects=False,
+                )
+
+                self.assertEqual(response.status_code, 303)
+                self.assertEqual(len(list(appmod.settings.upload_dir.glob("*.pdf"))), 1)
+                self.assertEqual(len(list(appmod.settings.processed_dir.glob("*.png"))), 1)
+
+                job = appmod.recent_uploads()[0]
+                self.assertEqual(job["original_type"], "pdf")
+                self.assertEqual(job["rendered_type"], "png")
+                self.assertEqual(job["rotation_applied"], 90)
+                self.assertEqual(Path(job["processed_path"]).suffix.lower(), ".png")
+                self.assertGreater(job["height"], job["width"])
+                self.assertIn("rendered", job["dimensions"])
+                self.assertIn("processed", job["dimensions"])
 
     def test_print_upload_records_success_without_real_printer(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

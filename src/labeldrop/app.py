@@ -11,17 +11,21 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
 
+import fitz
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageOps, UnidentifiedImageError
 
 from munbyn_itpp130b import Label, TSPLGenerator, USBTransport
 from munbyn_itpp130b.discovery import identify
 from munbyn_itpp130b.transport import status as printer_status
 
 LOGGER = logging.getLogger("labeldrop")
+LABEL_4X6 = Label.shipping_4x6()
+LABEL_WIDTH_DOTS = int(round(LABEL_4X6.width_mm * LABEL_4X6.dots_per_mm))
+LABEL_HEIGHT_DOTS = int(round(LABEL_4X6.height_mm * LABEL_4X6.dots_per_mm))
 
 
 @dataclass(frozen=True)
@@ -119,6 +123,13 @@ def printer_snapshot() -> dict[str, Any]:
     return snapshot
 
 
+def flatten_to_white(image: Image.Image) -> Image.Image:
+    rgba = image.convert("RGBA")
+    base = Image.new("RGBA", rgba.size, "white")
+    base.alpha_composite(rgba)
+    return base.convert("RGB")
+
+
 def normalize_png(source: Path, target: Path) -> tuple[int, int]:
     try:
         with Image.open(source) as img:
@@ -127,19 +138,78 @@ def normalize_png(source: Path, target: Path) -> tuple[int, int]:
             img.load()
             if img.format != "PNG":
                 raise ValueError("Uploaded file is not a PNG")
-            normalized = Image.new("RGBA", img.size, "white")
-            if img.mode == "RGBA":
-                normalized.alpha_composite(img.convert("RGBA"))
-            else:
-                normalized.alpha_composite(img.convert("RGBA"))
-            normalized.convert("RGB").save(target, "PNG", optimize=True)
+            normalized = flatten_to_white(img)
+            normalized.save(target, "PNG", optimize=True)
             return normalized.size
     except (UnidentifiedImageError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+def fit_to_label_canvas(image: Image.Image) -> Image.Image:
+    contained = ImageOps.contain(image, (LABEL_WIDTH_DOTS, LABEL_HEIGHT_DOTS), Image.Resampling.LANCZOS)
+    canvas = Image.new("RGB", (LABEL_WIDTH_DOTS, LABEL_HEIGHT_DOTS), "white")
+    offset = (
+        (LABEL_WIDTH_DOTS - contained.width) // 2,
+        (LABEL_HEIGHT_DOTS - contained.height) // 2,
+    )
+    canvas.paste(contained, offset)
+    return canvas
+
+
+def render_pdf_first_page(source: Path, target: Path) -> dict[str, Any]:
+    try:
+        with fitz.open(source) as document:
+            if document.page_count < 1:
+                raise ValueError("Uploaded PDF has no pages")
+            page = document.load_page(0)
+            pixmap = page.get_pixmap(dpi=203, alpha=True)
+    except (RuntimeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=f"PDF render failed: {exc}") from exc
+
+    mode = "RGBA" if pixmap.alpha else "RGB"
+    rendered = Image.frombytes(mode, (pixmap.width, pixmap.height), pixmap.samples)
+    flattened = flatten_to_white(rendered)
+    rotation_applied = 0
+    if flattened.width > flattened.height:
+        flattened = flattened.rotate(90, expand=True)
+        rotation_applied = 90
+    normalized = fit_to_label_canvas(flattened)
+    normalized.save(target, "PNG", optimize=True)
+    return {
+        "rendered_dimensions": {"width": pixmap.width, "height": pixmap.height},
+        "processed_dimensions": {"width": normalized.width, "height": normalized.height},
+        "rotation_applied": rotation_applied,
+    }
+
+
+def process_upload(upload_path: Path, processed_path: Path, original_type: str) -> dict[str, Any]:
+    if original_type == "png":
+        width, height = normalize_png(upload_path, processed_path)
+        return {
+            "original_type": "png",
+            "rendered_type": "png",
+            "rotation_applied": 0,
+            "dimensions": {
+                "original": {"width": width, "height": height},
+                "processed": {"width": width, "height": height},
+            },
+        }
+    if original_type == "pdf":
+        pdf_result = render_pdf_first_page(upload_path, processed_path)
+        return {
+            "original_type": "pdf",
+            "rendered_type": "png",
+            "rotation_applied": pdf_result["rotation_applied"],
+            "dimensions": {
+                "rendered": pdf_result["rendered_dimensions"],
+                "processed": pdf_result["processed_dimensions"],
+            },
+        }
+    raise HTTPException(status_code=400, detail="Unsupported upload type")
+
+
 def print_image(path: Path) -> int:
-    payload = TSPLGenerator(Label.shipping_4x6()).from_image(path, invert=True)
+    payload = TSPLGenerator(LABEL_4X6).from_image(path, invert=True)
     return USBTransport(settings.device).send(payload)
 
 
@@ -159,38 +229,54 @@ def home(request: Request, message: str | None = None, error: str | None = None)
 
 @app.post("/upload")
 async def upload_label(file: UploadFile = File(...)) -> RedirectResponse:
-    if file.content_type not in {"image/png", "application/octet-stream"}:
-        return redirect_home(error="Please upload a PNG file.")
-
     job_id = uuid.uuid4().hex
     original_name = Path(file.filename or "label.png").name
-    upload_path = settings.upload_dir / f"{job_id}.png"
+    suffix = Path(original_name).suffix.lower()
+    type_by_suffix = {".png": "png", ".pdf": "pdf"}
+    original_type = type_by_suffix.get(suffix)
+    if original_type is None:
+        return redirect_home(error="Please upload a PNG or PDF file.")
+
+    upload_path = settings.upload_dir / f"{job_id}{suffix}"
     processed_path = settings.processed_dir / f"{job_id}.png"
 
     data = await file.read(settings.max_upload_bytes + 1)
     if len(data) > settings.max_upload_bytes:
-        return redirect_home(error="PNG is too large.")
+        return redirect_home(error=f"{original_type.upper()} is too large.")
 
     upload_path.write_bytes(data)
     try:
-        width, height = normalize_png(upload_path, processed_path)
+        processing = process_upload(upload_path, processed_path, original_type)
     except HTTPException as exc:
         upload_path.unlink(missing_ok=True)
+        processed_path.unlink(missing_ok=True)
         return redirect_home(error=str(exc.detail))
 
     job = {
         "id": job_id,
         "created_at": utc_now(),
         "original_name": original_name,
+        "original_type": processing["original_type"],
+        "rendered_type": processing["rendered_type"],
+        "rotation_applied": processing["rotation_applied"],
         "upload_path": str(upload_path),
         "processed_path": str(processed_path),
         "preview_url": f"/processed/{job_id}.png",
-        "width": width,
-        "height": height,
+        "width": processing["dimensions"]["processed"]["width"],
+        "height": processing["dimensions"]["processed"]["height"],
+        "dimensions": processing["dimensions"],
         "last_print": None,
     }
     save_job(job)
-    LOGGER.info("Saved upload id=%s name=%s size=%sx%s", job_id, original_name, width, height)
+    LOGGER.info(
+        "Saved upload id=%s name=%s type=%s processed=%sx%s rotation=%s",
+        job_id,
+        original_name,
+        processing["original_type"],
+        job["width"],
+        job["height"],
+        processing["rotation_applied"],
+    )
     return redirect_home(message="Upload ready to print.")
 
 
@@ -213,7 +299,7 @@ def print_upload(job_id: str) -> RedirectResponse:
 @app.post("/print-test")
 def print_test_label() -> RedirectResponse:
     try:
-        payload = TSPLGenerator(Label.shipping_4x6()).text_label("LabelDrop test")
+        payload = TSPLGenerator(LABEL_4X6).text_label("LabelDrop test")
         sent = USBTransport(settings.device).send(payload)
         LOGGER.info("Printed test label bytes=%s", sent)
         return redirect_home(message="Test label sent to printer.")

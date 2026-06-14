@@ -4,17 +4,18 @@ LabelDrop is a LAN-only FastAPI print server for a MUNBYN ITPP130B attached to a
 
 The app layer handles phone uploads, PNG normalization, previews, and print buttons. The reusable printer logic stays in [`munbyn-itpp130b-linux`](https://github.com/benleiber/munbyn-itpp130b-linux), which is consumed as a Python dependency.
 
-## v0.1 Scope
+## Current Scope
 
 - FastAPI backend with a simple HTML frontend.
-- Home page with printer status, PNG upload form, and recent uploads.
+- Home page with printer status, PNG/PDF upload form, and recent uploads.
 - Upload storage in `data/uploads/`.
 - Normalized preview/print PNGs in `data/processed/`.
-- Print uploaded PNGs through the `munbyn-itpp130b` toolkit.
+- Print uploaded PNGs and rendered PDFs through the `munbyn-itpp130b` toolkit.
 - Print a basic test label.
 - Basic application logging.
+- Optional permanent service via `systemd`.
 
-Out of scope for this first version: PDF support, marketplace integrations, accounts, internet exposure, Docker, CUPS, a database, auto-crop, and advanced rotation.
+Out of scope: marketplace integrations, accounts, internet exposure, Docker, CUPS, a database, auto-crop, and advanced rotation.
 
 ## Debian Setup
 
@@ -33,7 +34,7 @@ cd labeldrop
 python3.11 -m venv .venv
 . .venv/bin/activate
 python -m pip install --upgrade pip
-python -m pip install -e .
+python -m pip install -e ".[dev]"
 ```
 
 Confirm the printer is visible and writable:
@@ -86,19 +87,52 @@ Run the minimal test suite:
 python -m unittest discover -s tests
 ```
 
+## systemd Service
+
+Install the unit:
+
+```bash
+sudo cp systemd/labeldrop.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable labeldrop
+sudo systemctl start labeldrop
+```
+
+Check service state and logs:
+
+```bash
+sudo systemctl status labeldrop
+journalctl -u labeldrop -f
+```
+
+The checked-in unit defaults to:
+
+- `User=ben`
+- `WorkingDirectory=/home/ben/labeldrop`
+- `LABELDROP_DEVICE=/dev/usb/lp0`
+- `LABELDROP_DATA_DIR=data`
+- `LABELDROP_HOST=0.0.0.0`
+- `LABELDROP_PORT=8000`
+
+If you deploy under a different local user or path, update the unit file before copying it into `/etc/systemd/system/`.
+
+Full notes: [docs/SYSTEMD.md](docs/SYSTEMD.md)
+
 ## Workflow
 
 1. Visit the local page from a LAN browser.
-2. Upload a PNG label image.
+2. Upload a PNG or PDF label file.
 3. Review the generated preview in recent uploads.
 4. Press `Print` on that upload.
 5. LabelDrop generates TSPL with the driver toolkit and writes it to `/dev/usb/lp0`.
 
-`Print test label` sends a simple text label and is useful for checking transport before trying an uploaded image.
+PDF uploads render page 1, flatten onto white, rotate landscape pages to portrait, and save a processed PNG preview before printing.
+
+`Print test label` sends a simple text label and is useful for checking transport before trying an uploaded file.
 
 ## Notes
 
 - This prototype has no authentication and should stay on a trusted local network.
-- The uploaded file must be PNG.
-- Normalization currently flattens transparency onto white and preserves the image size.
+- PNG uploads flatten transparency onto white and preserve their image size.
+- PDF uploads render the first page to PNG, rotate landscape output to portrait, and fit onto a 4x6 portrait canvas.
 - Application state is filesystem-only JSON metadata beside processed images; there is no database.

@@ -59,7 +59,8 @@ h3 {
 .topbar p,
 .empty,
 dd,
-.upload-meta p {
+.upload-meta p,
+.helper {
   color: var(--muted);
 }
 
@@ -138,6 +139,10 @@ input::file-selector-button:hover {
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+.helper {
+  margin-bottom: 0;
 }
 
 .notice {

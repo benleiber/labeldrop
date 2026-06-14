@@ -43,11 +43,12 @@
       </section>
 
       <section class="panel">
-        <h2>Upload PNG</h2>
+        <h2>Upload Label</h2>
         <form class="upload-form" action="/upload" method="post" enctype="multipart/form-data">
-          <input type="file" name="file" accept="image/png" required>
+          <input type="file" name="file" accept=".png,.pdf,image/png,application/pdf" required>
           <button type="submit">Upload label</button>
         </form>
+        <p class="helper">Accepts PNG or one-page label PDF. PDF uploads render page 1, rotate landscape to portrait, and generate a PNG preview.</p>
       </section>
 
       <section>
@@ -59,7 +60,11 @@
                 <img src="{{ item.preview_url }}" alt="Preview for {{ item.original_name }}">
                 <div class="upload-meta">
                   <h3>{{ item.original_name }}</h3>
+                  <p>{{ item.original_type|upper }} to {{ item.rendered_type|upper }}</p>
                   <p>{{ item.width }} x {{ item.height }} px</p>
+                  {% if item.rotation_applied %}
+                    <p>Rotated {{ item.rotation_applied }} degrees</p>
+                  {% endif %}
                   <p>{{ item.created_at }}</p>
                   {% if item.last_print %}
                     {% if item.last_print.ok %}
